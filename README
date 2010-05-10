@@ -1,0 +1,7 @@
+django-emailqueue
+
+== Description
+Put e-mails into queue then send them using cron
+
+== Authors
+ * Alexandru Plugaru (alexandru.plugaru@gmail.com)
