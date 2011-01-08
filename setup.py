@@ -3,7 +3,7 @@ from setuptools import setup
 
 setup(
     name='django-emailqueue',
-    version='0.1',
+    version='0.2',
     description='Django app for sending queued emails using cron',
     author='Alexandru Plugaru',
     author_email='alexandru.plugaru@gmail.com',

@@ -6,6 +6,7 @@
 #
 
 import sys, os
+from datetime import datetime
 
 try:
     sys.path.append(sys.argv[1])
@@ -39,36 +40,45 @@ def lock(dir):
 def unlock(dir):
     os.rmdir(dir)
 
+def send_emails():
+    """ Send mass e-mails. Mark them and update the sent date.
+    If an error is encountered notify admins
+
+    """
+    try:
+        mass = []
+        sent_queues = []
+        email_queues = EmailQueue.objects.exclude(sent=True).all()
+        for queue in email_queues:
+            sent_queues.append(queue.pk)
+            mass.append((queue.mail_subject, queue.mail_body,
+                         queue.mail_from, [queue.mail_to], ))
+        send_mass_mail(tuple(mass))
+        EmailQueue.objects.filter(pk__in=sent_queues).update(sent=True,
+                                                sent_datetime=datetime.now())
+    except Exception, e:
+        mail_admins("django_emailqueue exception", str(e))
+
 def main():
-    #Cycle through apps and execute app_name.cron.cron
-    for app in settings.INSTALLED_APPS:
-        if not app.startswith('django.'):
-            try:
-                module = __import__(app)
-            except ImportError:
-                continue
-            try:
-                cron = __import__(module.__name__ + '.cron')
-            except ImportError:
-                continue
-            try:
-                if hasattr(cron, 'cron') and hasattr(cron.cron, 'cron'):
-                    if callable(cron.cron.cron):
-                        cron.cron.cron()
-            except Exception, e:
-                mail_admins("django_emailqueue exception", str(e))
     if lock(LOCK): # Acquire lock by creating a temporary directory
-        try:
-            mass = []
-            delete_queues = []
-            email_queues = EmailQueue.objects.exclude(deleted=True).all()
-            for queue in email_queues:
-                delete_queues.append(queue.pk)
-                mass.append((queue.mail_subject, queue.mail_body, queue.mail_from, [queue.mail_to]))
-            send_mass_mail(tuple(mass))
-            EmailQueue.objects.filter(pk__in=delete_queues).update(deleted=True)
-        except Exception, e:
-            mail_admins("django_emailqueue exception", str(e))
+        #Cycle through apps and execute app_name.cron.emailqueue
+        for app in settings.INSTALLED_APPS:
+            if not app.startswith('django.'):
+                try:
+                    module = __import__(app)
+                except ImportError:
+                    continue
+                try:
+                    cron = __import__(module.__name__ + '.cron')
+                except ImportError:
+                    continue
+                try:
+                    if hasattr(cron, 'cron') and hasattr(cron.cron, 'emailqueue'):
+                        if callable(cron.cron.emailqueue):
+                            cron.cron.emailqueue()
+                except Exception, e:
+                    mail_admins("django_emailqueue exception", str(e))
+        send_emails()
         unlock(LOCK) # Release lock by deleting that directory
 
 if __name__ == "__main__":
